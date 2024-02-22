@@ -6,10 +6,14 @@
 #define PROJECTOR_CTRL_PWR_BY_RELAY 1
 #endif //PROJECTOR_CTRL_PWR_BY_RELAY
 
-#define PROJECTOR_CTRL_SERIAL_TIMEOUT 10 //up to 254 seconds
+#ifdef USE_PROJECTOR_CTRL_EPSON
+	#define PROJECTOR_CTRL_SERIAL_TIMEOUT 30 //up to 254 seconds
+#else
+	#define PROJECTOR_CTRL_SERIAL_TIMEOUT 10 //up to 254 seconds
+#endif
 
 #ifndef PROJECTOR_CTRL_SERIAL_BAUDRATE
-#define PROJECTOR_CTRL_SERIAL_BAUDRATE 9600
+	#define PROJECTOR_CTRL_SERIAL_BAUDRATE 9600
 #endif //PROJECTOR_CTRL_SERIAL_BAUDRATE
 
 #ifdef USE_PROJECTOR_CTRL_NEC
@@ -93,6 +97,34 @@ static const struct projector_ctrl_command_info_s projector_ctrl_commands[] = {
 #define PROJECTOR_CTRL_QRYPWR_STARTING '1' //placebo
 #define PROJECTOR_CTRL_QRYPWR_WARMING '1'  //placebo
 
+#elif defined(USE_PROJECTOR_CTRL_EPSON)
+/* see the serial codes in ESC/VP21 Command User’s Guide for Home Projectors
+ * https://files.support.epson.com/pdf/pltw1_/pltw1_cm.pdf
+ * and ESC/VP21 Command User's Guide for Business Projectors
+ * https://download.epson-europe.com/pub/download/3222/epson322269eu.pdf
+ */
+#define PROJECTOR_CTRL_LOGNAME	"LCD[EPSON]"
+static const uint8_t projector_ctrl_msg_qry_typ[] = { 0x0d }; // <CR>
+static const uint8_t projector_ctrl_msg_qry_pwr[] = { 'P', 'W', 'R', '?', 0x0d }; // PWR? 
+static const uint8_t projector_ctrl_msg_qry_lmp[] = { 'L', 'A', 'M', 'P', '?', 0x0d }; // LAMP? 
+static const uint8_t projector_ctrl_msg_pwr_on[] = { 'P', 'W', 'R', ' ', 'O', 'N', 0x0d }; // PWR ON
+static const uint8_t projector_ctrl_msg_pwr_off[] = { 'P', 'W', 'R', ' ', 'O', 'F', 'F', 0x0d }; //PWR OFF
+static const struct projector_ctrl_command_info_s projector_ctrl_commands[] = {
+	{PROJECTOR_CTRL_S_QRY_TYPE, &projector_ctrl_msg_qry_typ[0], sizeof(projector_ctrl_msg_qry_typ), // Expected response: ':'
+								PROJECTOR_CTRL_SERIAL_TIMEOUT, ':', 1, 0, 1, 'E', 5, 0, 0}, 		// Error resp.: 'E','R','R',0x0D,':'
+	{PROJECTOR_CTRL_S_QRY_PWR,  &projector_ctrl_msg_qry_pwr[0], sizeof(projector_ctrl_msg_qry_pwr), // Expected response: 'P','W','R','=','0','0',0x0D,':'
+								PROJECTOR_CTRL_SERIAL_TIMEOUT, 'P', 8, 4, 1, 'E', 5, 0, 0}, 		// Error resp.: 'E','R','R',0x0D,':'
+	{PROJECTOR_CTRL_S_QRY_LAMP,  &projector_ctrl_msg_qry_lmp[0], sizeof(projector_ctrl_msg_qry_lmp),// Expected response: 'L','A','M','P','=','0','0','0','0','0',0x0D,':'
+								PROJECTOR_CTRL_SERIAL_TIMEOUT, 'L', 11, 5, 3, 'E', 5, 0, 0},		// Error resp.: 'E','R','R',0x0D,':'
+	{PROJECTOR_CTRL_S_PWR_ON,   &projector_ctrl_msg_pwr_on[0], sizeof(projector_ctrl_msg_pwr_on),	// Expected response: ':'
+								PROJECTOR_CTRL_SERIAL_TIMEOUT, ':', 1, 0, 1, 'E', 5, 0, 0}, 		// Error resp.: 'E','R','R',0x0D,':'
+	{PROJECTOR_CTRL_S_PWR_OFF,  &projector_ctrl_msg_pwr_off[0], sizeof(projector_ctrl_msg_pwr_off), // Expected response: ':'
+								PROJECTOR_CTRL_SERIAL_TIMEOUT, ':', 1, 0, 1, 'E', 5, 0, 0}			// Error resp.: 'E','R','R',0x0D,':'
+};
+#define PROJECTOR_CTRL_QRYPWR_ON      0x3031
+#define PROJECTOR_CTRL_QRYPWR_COOLING 0x3033 //placebo
+#define PROJECTOR_CTRL_QRYPWR_STARTING 0x3032
+#define PROJECTOR_CTRL_QRYPWR_WARMING 0x3034 //placebo
 
 #else
 #error USE_PROJECTOR_CTRL: No projector type defined

@@ -28,7 +28,7 @@
 
 #define XDRV_53			53
 
-#if !defined(USE_PROJECTOR_CTRL_NEC) && !defined(USE_PROJECTOR_CTRL_OPTOMA) && !defined(USE_PROJECTOR_CTRL_ACER)
+#if !defined(USE_PROJECTOR_CTRL_NEC) && !defined(USE_PROJECTOR_CTRL_OPTOMA) && !defined(USE_PROJECTOR_CTRL_ACER) && !defined(USE_PROJECTOR_CTRL_EPSON)
 #define USE_PROJECTOR_CTRL_NEC                 // Use at least one projector
 #endif
 
@@ -46,6 +46,7 @@ enum projector_ctrl_serial_state_e : uint8_t {
 	PROJECTOR_CTRL_S_UNCONNECTED=0,
 	PROJECTOR_CTRL_S_QRY_PWR,
 	PROJECTOR_CTRL_S_QRY_TYPE,
+	PROJECTOR_CTRL_S_QRY_LAMP,
 	PROJECTOR_CTRL_S_IDLE,
 	PROJECTOR_CTRL_S_PWR_ON,
 	PROJECTOR_CTRL_S_PWR_OFF
@@ -86,6 +87,7 @@ struct projector_ctrl_softc_s {
 	uint8_t			               sc_ser_sum;
 	uint8_t			               sc_ser_len;
 	uint32_t			           sc_ser_value;
+	int32_t				           sc_lamp_hours;
 } __packed;
 
 static struct projector_ctrl_softc_s	*projector_ctrl_sc = nullptr;
@@ -128,7 +130,7 @@ projector_ctrl_pre_init(void)
 
   UpdateDevicesPresent(1); /* claim a POWER device slot */
 	sc->sc_device = TasmotaGlobal.devices_present;
-
+	sc->sc_lamp_hours = -1;
 	AddLog(LOG_LEVEL_INFO, PSTR(PROJECTOR_CTRL_LOGNAME ": new RELAY%d, polling serial for Projector status"), sc->sc_device);
 
 	projector_ctrl_sc = sc;
@@ -263,7 +265,7 @@ projector_ctrl_parse(struct projector_ctrl_softc_s *sc, const uint8_t byte)
 		if (sc->sc_ser_result==PROJECTOR_CTRL_R_PASS){
 			if (sc->sc_ser_len==(cmd->pass_value_offset+1))
 				sc->sc_ser_value=byte;
-			if ((sc->sc_ser_len>(cmd->pass_value_offset+1))&&(sc->sc_ser_len<=(cmd->pass_value_offset+cmd->pass_value_bytes)))
+			if ((sc->sc_ser_len>(cmd->pass_value_offset+1))&&(sc->sc_ser_len<=(cmd->pass_value_offset+1+cmd->pass_value_bytes)))
 				sc->sc_ser_value=(sc->sc_ser_value<<8)|byte;
 			if (sc->sc_ser_len==cmd->pass_len){
 #ifdef USE_PROJECTOR_CTRL_NEC
@@ -307,7 +309,11 @@ projector_ctrl_parse(struct projector_ctrl_softc_s *sc, const uint8_t byte)
 					AddLog(LOG_LEVEL_DEBUG, PSTR(PROJECTOR_CTRL_LOGNAME
 						": CMD %02x FAIL, got %02x bytes, retval %02x, going idle"), nstate, sc->sc_ser_len, sc->sc_ser_value);
 #endif //DEBUG_PROJECTOR_CTRL
-					nstate=PROJECTOR_CTRL_S_IDLE;
+					if(cmd->command == PROJECTOR_CTRL_S_QRY_LAMP) {
+						nstate=PROJECTOR_CTRL_S_QRY_LAMP;
+					} else {
+						nstate=PROJECTOR_CTRL_S_IDLE;
+					}
 				};
 			};
 		};
@@ -372,6 +378,9 @@ projector_ctrl_loop(struct projector_ctrl_softc_s *sc)
 					projector_ctrl_request(sc,oldstate);
 				};
 				break;
+			case PROJECTOR_CTRL_S_QRY_LAMP:
+				sc->sc_lamp_hours = sc->sc_ser_value;
+				break;
 		};
 	}
 }
@@ -396,6 +405,9 @@ projector_ctrl_tick(struct projector_ctrl_softc_s *sc)
 				break;
 			case 8:
 				projector_ctrl_request(sc,PROJECTOR_CTRL_S_QRY_TYPE);
+				break;
+			case 15:
+				projector_ctrl_request(sc,PROJECTOR_CTRL_S_QRY_LAMP);
 				break;
 		};
 	}else if(sc->sc_ticks > sc->sc_cmd_info->timeout_ticks){
@@ -438,6 +450,62 @@ projector_ctrl_set_power(struct projector_ctrl_softc_s *sc)
 	return (true);
 }
 
+// web + json interface
+static void projector_show(struct projector_ctrl_softc_s *sc, boolean json) {
+	char tlampstr[32];
+	char name[24] = {"1"};
+	char unit[8] = {"h"};
+	int32_t lamp_hours = sc->sc_lamp_hours;
+	uint32_t digit_mask = 0xFF000000;
+	uint8_t mask_shift = 24;
+	uint8_t digit_idx = 0;
+	char digit = 0;
+	if(json) {
+		if(lamp_hours > 0) {
+			for(int i = 0; i < 4; i++) {
+				digit = ((lamp_hours & digit_mask) >> mask_shift);
+				if(digit >= 0x30 && digit < 0x3A) {
+					tlampstr[digit_idx] = digit;
+					digit_mask = digit_mask >> 8;
+					mask_shift -= 8;
+					digit_idx++;
+				} else {
+					digit_mask = digit_mask >> 8;
+					mask_shift -= 8;
+					continue;
+				}
+			}
+			tlampstr[digit_idx] = 0x00;
+			ResponseAppend_P(PSTR(",\"%s\":{\"" D_JSON_ID "\":\"%s\",\"" D_JSON_COUNTER "\":%s}"),
+			PSTR("Projector"), name, tlampstr);
+		}
+	} else {
+		//WSContentSend_P(PSTR("<tr><td colspan=2>"));
+		WSContentSend_P(PSTR("{s}%s %s{m}"), "Lamp", name);  // Do not replace decimal separator in label
+		if(lamp_hours < 0) {
+			sprintf_P(tlampstr, PSTR("N/A"));
+			WSContentSend_P(PSTR("%s {e}"), tlampstr); // Replace decimal separator in value
+		} else {
+			for(int i = 0; i < 4; i++) {
+				digit = ((lamp_hours & digit_mask) >> mask_shift);
+				if(digit >= 0x30 && digit < 0x3A) {
+					tlampstr[digit_idx] = digit;
+					digit_mask = digit_mask >> 8;
+					mask_shift -= 8;
+					digit_idx++;
+				} else {
+					digit_mask = digit_mask >> 8;
+					mask_shift -= 8;
+					continue;
+				}
+			}
+			tlampstr[digit_idx] = 0x00;
+			//sprintf_P(tlampstr, PSTR("%d"), sc->sc_lamp_hours);
+			WSContentSend_P(PSTR("%s %s{e}"), tlampstr, unit); // Replace decimal separator in value
+		}
+	}
+
+}
 
 /*********************************************************************************************\
  * Interface
@@ -479,6 +547,17 @@ bool Xdrv53(uint32_t function) {
     case FUNC_ACTIVE:
         result = true;
         break;
+
+	case FUNC_JSON_APPEND:
+        projector_show(sc, 1);
+        break;
+
+	#ifdef USE_WEBSERVER
+	case FUNC_WEB_SENSOR:
+		//snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("%s{s}MPR121%c Button%d{m}%d{e}"), mqtt_data, pS->id[i], j, BITC(i,j));
+		projector_show(sc, 0);
+		break;
+	#endif // USE_WEBSERVER
 
 	}
 
