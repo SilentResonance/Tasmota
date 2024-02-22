@@ -25,6 +25,7 @@
 #define PROJECTOR_CTRL_LOGNAME	"DLP[NEC]"
 static const uint8_t projector_ctrl_msg_qry_typ[] = { 0x00, 0xBF, 0x00, 0x00, 0x01, 0x00 }; //page81
 static const uint8_t projector_ctrl_msg_qry_pwr[] = { 0x00, 0xBF, 0x00, 0x00, 0x01, 0x02 }; //page83
+static const uint8_t projector_ctrl_msg_qry_lmp[] = {0x03, 0x96, 0x00, 0x00, 0x02, 0x00, 0x01}; // page 34
 static const uint8_t projector_ctrl_msg_pwr_on[] = { 0x02, 0x00, 0x00, 0x00, 0x00 };        //page15
 static const uint8_t projector_ctrl_msg_pwr_off[] = { 0x02, 0x01, 0x00, 0x00, 0x00 };       //page16
 static const struct projector_ctrl_command_info_s projector_ctrl_commands[] = {
@@ -32,6 +33,8 @@ static const struct projector_ctrl_command_info_s projector_ctrl_commands[] = {
 								PROJECTOR_CTRL_SERIAL_TIMEOUT, 0x20, 22, 8, 4, 0xA0, 8, 5, 2},
 	{PROJECTOR_CTRL_S_QRY_PWR,  &projector_ctrl_msg_qry_pwr[0], sizeof(projector_ctrl_msg_qry_pwr),
 								PROJECTOR_CTRL_SERIAL_TIMEOUT, 0x20, 22, 6, 1, 0xA0, 8, 5, 2},
+	{PROJECTOR_CTRL_S_QRY_LAMP,  &projector_ctrl_msg_qry_lmp[0], sizeof(projector_ctrl_msg_qry_lmp),// Expected response: 0x23, 0x96, 0x00, 0x00, 0x06, 0x00, 0x01, 0x50, 0x46, 0x00, 0x00 <Checksum>
+								PROJECTOR_CTRL_SERIAL_TIMEOUT, 0x23, 12, 7, 3, 0xA3, 8, 5, 2},		// Error resp.: 0xA3, 0x96, 0x00, 0x00, 0x02, 0x00, 0x00 <Checksum>
 	{PROJECTOR_CTRL_S_PWR_ON,   &projector_ctrl_msg_pwr_on[0], sizeof(projector_ctrl_msg_pwr_on),
 								PROJECTOR_CTRL_SERIAL_TIMEOUT, 0x22, 6, 0, 1, 0xA2, 8, 5, 2},
 	{PROJECTOR_CTRL_S_PWR_OFF,  &projector_ctrl_msg_pwr_off[0], sizeof(projector_ctrl_msg_pwr_off),
@@ -51,6 +54,7 @@ static const struct projector_ctrl_command_info_s projector_ctrl_commands[] = {
 #define PROJECTOR_CTRL_LOGNAME	"DLP[OPTOMA]"
 static const uint8_t projector_ctrl_msg_qry_typ[] = { 0x7e, 0x30, 0x30, 0x31, 0x32, 0x32, 0x20, 0x31, 0x0d }; //page59
 static const uint8_t projector_ctrl_msg_qry_pwr[] = { 0x7e, 0x30, 0x30, 0x31, 0x32, 0x34, 0x20, 0x31, 0x0d }; //page59
+static const uint8_t projector_ctrl_msg_qry_lmp[] = {0x7e, 0x30, 0x30, 0x31, 0x30, 0x38, 0x20, 0x32, 0x0d}; // page 59, 0x7E, 0x30, 0x30, 0x31, 0x30, 0x38, 0x20, 0x32, 0x0D (Error in PDF between Lamp Hours and Cumulative Lamp Hours, ASCII differs, HEX Code does not)
 static const uint8_t projector_ctrl_msg_pwr_on[] = { 0x7e, 0x30, 0x30, 0x30, 0x30, 0x20, 0x31, 0x0d };        //page56
 static const uint8_t projector_ctrl_msg_pwr_off[] = { 0x7e, 0x30, 0x30, 0x30, 0x30, 0x20, 0x30, 0x0d };       //page56
 static const struct projector_ctrl_command_info_s projector_ctrl_commands[] = {
@@ -58,6 +62,8 @@ static const struct projector_ctrl_command_info_s projector_ctrl_commands[] = {
 								PROJECTOR_CTRL_SERIAL_TIMEOUT, 'O', 6, 2, 4, 'I', 5, 4, 1},
 	{PROJECTOR_CTRL_S_QRY_PWR,  &projector_ctrl_msg_qry_pwr[0], sizeof(projector_ctrl_msg_qry_pwr),
 								PROJECTOR_CTRL_SERIAL_TIMEOUT, 'O', 3, 2, 1, 'I', 5, 4, 1},
+	{PROJECTOR_CTRL_S_QRY_LAMP,  &projector_ctrl_msg_qry_lmp[0], sizeof(projector_ctrl_msg_qry_lmp),// Expected response: 'O', 'K', 0x00, 0x00, 0x00, 0x06, 0x00
+								PROJECTOR_CTRL_SERIAL_TIMEOUT, 'O', 7, 4, 4, 'I', 5, 4, 1},		// Error resp. not found in PDF, expecting same as other queries
 	{PROJECTOR_CTRL_S_PWR_ON,   &projector_ctrl_msg_pwr_on[0], sizeof(projector_ctrl_msg_pwr_on),
 								PROJECTOR_CTRL_SERIAL_TIMEOUT, 'P', 1, 0, 1, 'F', 1, 0, 1},
 	{PROJECTOR_CTRL_S_PWR_OFF,  &projector_ctrl_msg_pwr_off[0], sizeof(projector_ctrl_msg_pwr_off),
@@ -80,6 +86,7 @@ static const struct projector_ctrl_command_info_s projector_ctrl_commands[] = {
 //static const uint8_t projector_ctrl_msg_qry_typ[] = { '*',' ','0',' ','I','R',' ','0','3','5', 0x0d }; //line50 - responds *000\rModel Model P1500E\r [fails in stand-by mode]
 static const uint8_t projector_ctrl_msg_qry_typ[] = { '*',' ','0',' ','L','a','m','p',' ','?', 0x0d }; //cannot query type, so query Lamp status instead
 static const uint8_t projector_ctrl_msg_qry_pwr[] = { '*',' ','0',' ','L','a','m','p',' ','?', 0x0d }; //line97 - responds *000\rLamp 0\r
+static const uint8_t projector_ctrl_msg_qry_lmp[] = { '*',' ','0',' ','L','a','m','p', 0x0d}; //line105 - responds XXXX\r
 static const uint8_t projector_ctrl_msg_pwr_on[]  = { '*',' ','0',' ','I','R',' ','0','0','1', 0x0d }; //line18 - responds *000\r
 static const uint8_t projector_ctrl_msg_pwr_off[] = { '*',' ','0',' ','I','R',' ','0','0','2', 0x0d }; //line19 - responds *000\r
 static const struct projector_ctrl_command_info_s projector_ctrl_commands[] = {
@@ -87,6 +94,8 @@ static const struct projector_ctrl_command_info_s projector_ctrl_commands[] = {
 								PROJECTOR_CTRL_SERIAL_TIMEOUT, '*', 12, 10, 1, '?', 1, 0, 1},
 	{PROJECTOR_CTRL_S_QRY_PWR,  &projector_ctrl_msg_qry_pwr[0], sizeof(projector_ctrl_msg_qry_pwr),
 								PROJECTOR_CTRL_SERIAL_TIMEOUT, '*', 12, 10, 1, '?', 1, 0, 1},
+	{PROJECTOR_CTRL_S_QRY_LAMP,  &projector_ctrl_msg_qry_lmp[0], sizeof(projector_ctrl_msg_qry_lmp),// Expected response: XXXX\r
+								PROJECTOR_CTRL_SERIAL_TIMEOUT, 0x30, 5, 0, 4, '?', 1, 0, 1},		// Only working with 0-999 lamp hours
 	{PROJECTOR_CTRL_S_PWR_ON,   &projector_ctrl_msg_pwr_on[0], sizeof(projector_ctrl_msg_pwr_on),
 								PROJECTOR_CTRL_SERIAL_TIMEOUT, '*', 5, 0, 1, '?', 1, 0, 1},
 	{PROJECTOR_CTRL_S_PWR_OFF,  &projector_ctrl_msg_pwr_off[0], sizeof(projector_ctrl_msg_pwr_off),
@@ -115,7 +124,7 @@ static const struct projector_ctrl_command_info_s projector_ctrl_commands[] = {
 	{PROJECTOR_CTRL_S_QRY_PWR,  &projector_ctrl_msg_qry_pwr[0], sizeof(projector_ctrl_msg_qry_pwr), // Expected response: 'P','W','R','=','0','0',0x0D,':'
 								PROJECTOR_CTRL_SERIAL_TIMEOUT, 'P', 8, 4, 1, 'E', 5, 0, 0}, 		// Error resp.: 'E','R','R',0x0D,':'
 	{PROJECTOR_CTRL_S_QRY_LAMP,  &projector_ctrl_msg_qry_lmp[0], sizeof(projector_ctrl_msg_qry_lmp),// Expected response: 'L','A','M','P','=','0','0','0','0','0',0x0D,':'
-								PROJECTOR_CTRL_SERIAL_TIMEOUT, 'L', 11, 5, 3, 'E', 5, 0, 0},		// Error resp.: 'E','R','R',0x0D,':'
+								PROJECTOR_CTRL_SERIAL_TIMEOUT, 'L', 11, 5, 4, 'E', 5, 0, 0},		// Error resp.: 'E','R','R',0x0D,':'
 	{PROJECTOR_CTRL_S_PWR_ON,   &projector_ctrl_msg_pwr_on[0], sizeof(projector_ctrl_msg_pwr_on),	// Expected response: ':'
 								PROJECTOR_CTRL_SERIAL_TIMEOUT, ':', 1, 0, 1, 'E', 5, 0, 0}, 		// Error resp.: 'E','R','R',0x0D,':'
 	{PROJECTOR_CTRL_S_PWR_OFF,  &projector_ctrl_msg_pwr_off[0], sizeof(projector_ctrl_msg_pwr_off), // Expected response: ':'

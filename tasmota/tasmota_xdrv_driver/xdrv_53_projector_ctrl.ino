@@ -63,11 +63,11 @@ struct projector_ctrl_command_info_s {
 	const uint8_t  *send_codes;
 	const uint8_t   send_len;
 	const uint8_t   timeout_ticks;
-	const uint8_t   pass_first_byte;
-	const uint8_t   pass_len;
-	const uint8_t   pass_value_offset;
-	const uint8_t   pass_value_bytes;
-	const uint8_t   fail_first_byte;
+	const uint8_t   pass_first_byte;	// Value of first byte that is accepted as passed. Can be written as hex value like 0x43 or as character 'P'
+	const uint8_t   pass_len;			// Number of bytes of complete serial response to accept
+	const uint8_t   pass_value_offset;	// Number of bytes to skip. Counting starts at 1. The byte after that is taken as first pass_value_byte
+	const uint8_t   pass_value_bytes;	// Number of bytes to read as pass_value starting with pass_value_offset+1 as first byte
+	const uint8_t   fail_first_byte;	// See descriptions for pass above
 	const uint8_t   fail_len;
 	const uint8_t   fail_value_offset;
 	const uint8_t   fail_value_bytes;
@@ -265,7 +265,7 @@ projector_ctrl_parse(struct projector_ctrl_softc_s *sc, const uint8_t byte)
 		if (sc->sc_ser_result==PROJECTOR_CTRL_R_PASS){
 			if (sc->sc_ser_len==(cmd->pass_value_offset+1))
 				sc->sc_ser_value=byte;
-			if ((sc->sc_ser_len>(cmd->pass_value_offset+1))&&(sc->sc_ser_len<=(cmd->pass_value_offset+1+cmd->pass_value_bytes)))
+			if ((sc->sc_ser_len>(cmd->pass_value_offset+1))&&(sc->sc_ser_len<=(cmd->pass_value_offset+cmd->pass_value_bytes)))
 				sc->sc_ser_value=(sc->sc_ser_value<<8)|byte;
 			if (sc->sc_ser_len==cmd->pass_len){
 #ifdef USE_PROJECTOR_CTRL_NEC
