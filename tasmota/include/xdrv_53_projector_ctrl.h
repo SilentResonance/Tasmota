@@ -122,7 +122,7 @@ static const struct projector_ctrl_command_info_s projector_ctrl_commands[] = {
 	{PROJECTOR_CTRL_S_QRY_TYPE, &projector_ctrl_msg_qry_typ[0], sizeof(projector_ctrl_msg_qry_typ), // Expected response: ':'
 								PROJECTOR_CTRL_SERIAL_TIMEOUT, ':', 1, 0, 1, 'E', 5, 0, 0}, 		// Error resp.: 'E','R','R',0x0D,':'
 	{PROJECTOR_CTRL_S_QRY_PWR,  &projector_ctrl_msg_qry_pwr[0], sizeof(projector_ctrl_msg_qry_pwr), // Expected response: 'P','W','R','=','0','0',0x0D,':'
-								PROJECTOR_CTRL_SERIAL_TIMEOUT, 'P', 8, 4, 1, 'E', 5, 0, 0}, 		// Error resp.: 'E','R','R',0x0D,':'
+								PROJECTOR_CTRL_SERIAL_TIMEOUT, 'P', 8, 4, 2, 'E', 5, 0, 0}, 		// Error resp.: 'E','R','R',0x0D,':'
 	{PROJECTOR_CTRL_S_QRY_LAMP,  &projector_ctrl_msg_qry_lmp[0], sizeof(projector_ctrl_msg_qry_lmp),// Expected response: 'L','A','M','P','=','0','0','0','0','0',0x0D,':'
 								PROJECTOR_CTRL_SERIAL_TIMEOUT, 'L', 11, 5, 4, 'E', 5, 0, 0},		// Error resp.: 'E','R','R',0x0D,':'
 	{PROJECTOR_CTRL_S_PWR_ON,   &projector_ctrl_msg_pwr_on[0], sizeof(projector_ctrl_msg_pwr_on),	// Expected response: ':'
